@@ -1,6 +1,9 @@
 # 简介
 * 改自[rknn-cpp-Multithreading]https://github.com/leafqycc/rknn-cpp-Multithreading?tab=readme-ov-file
 * 使用线程池加速
+* 增加注释，方便初学者学习
 # 使用说明
 * 系统需安装有OpenCV
 * CMake构建项目
+# 模型
+* 使用官方模型通过[rknn-toolkit2]https://github.com/rockchip-linux/rknn-toolkit2/tree/master,进行转化
