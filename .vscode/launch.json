@@ -1,0 +1,32 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "CMake调试",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/rknn_engine_test", // 编译后的程序，需要结合CMakeLists.txt中的add_executable()函数
+            "args": [
+                "./weights/mobilenet_v1.rknn",
+                "./images/dog_224x224.jpg"
+            ],
+            "stopAtEntry": false, 
+            "cwd": "${workspaceFolder}", 
+            "environment": [], 
+            "externalConsole": false, 
+            "MIMode": "gdb", 
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake编译"
+        }
+    ]
+}
