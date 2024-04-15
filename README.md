@@ -6,4 +6,5 @@
 * 系统需安装有OpenCV
 * CMake构建项目
 # 模型
-* 使用官方模型通过[rknn-toolkit2]https://github.com/rockchip-linux/rknn-toolkit2/tree/master,进行转化
+* 使用官方模型转换rknn
+* 官方转换代码见：[rknn-toolkit2]https://github.com/rockchip-linux/rknn-toolkit2/tree/master
