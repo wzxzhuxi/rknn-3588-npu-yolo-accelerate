@@ -36,4 +36,5 @@
    cmake ..
    make
 6. 运行项目：
+   ```bash
    ./yolov5_detect 视频源 线程数
