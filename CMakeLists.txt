@@ -71,24 +71,6 @@ target_link_libraries(draw_lib
     ${OpenCV_LIBS}
 )
 
-# 测试自yolov5
-add_executable(yolov5_img src/yolov5_img.cpp)
-
-# 链接库
-target_link_libraries(yolov5_img
-        draw_lib
-        yolov5_lib
-)
-
-# 测试自yolov5 video
-add_executable(yolov5_video src/yolov5_video.cpp)
-
-# 链接库
-target_link_libraries(yolov5_video
-        draw_lib
-        yolov5_lib
-)
-
 # 测试自yolov5 thread pool
 add_executable(yolov5_thread_pool 
     src/yolov5_thread_pool.cpp
