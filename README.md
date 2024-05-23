@@ -37,4 +37,4 @@
    make
 6. 运行项目：
    ```bash
-   ./yolov5_detect 视频源 线程数
+   ./yolov5_detect 模型 视频源 线程数
