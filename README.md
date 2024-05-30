@@ -9,7 +9,7 @@ This project is an improved version of [rknn-cpp-Multithreading](https://github.
 ## Main Features
 
 - **Thread Pool Acceleration**: Uses thread pool technology to enhance model processing speed.
-- **Educational Comments**: Adds detailed comments to key parts of the code to facilitate understanding and learning for beginners.
+- **Educational Comments**: Adds detailed comments to key parts of the code to facilitate understanding and learning for beginners.(The comments are in Chinese)
 - **Open Source Foundation**: Based on an open-source project, inheriting and extending its functionality.
 
 ## Instructions
