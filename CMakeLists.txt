@@ -73,7 +73,7 @@ target_link_libraries(draw_lib
 
 # 测试自yolov5 thread pool
 add_executable(yolov5_thread_pool 
-    src/yolov5_thread_pool.cpp
+    src/yolov5_detect.cpp
     src/task/yolov5_thread_pool.cpp
     )
 
