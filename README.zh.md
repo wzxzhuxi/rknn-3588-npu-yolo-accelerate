@@ -40,5 +40,11 @@
    cmake ..
    make
 5. 运行项目：
+   首先返回主文件夹
    ```bash
-   ./yolov5_detect 模型 视频源 线程数
+   cd ..
+   ```bash
+   ./yolov5_thread_pool 模型 视频源 线程数
+   ```bash
+   或者运行sh脚本
+   ./yolorun.sh

@@ -39,6 +39,14 @@ This project uses the official model and converts it using the following tools:
    ```bash
    cmake ..
    make
-5. Run the project:
+5. Running the project:
+   First, return to the main directory
    ```bash
-   ./yolov5_detect <model> <video_source> <num_threads>
+   cd ..
+   Then run the following command:
+   ```bash
+   ./yolov5_thread_pool model video_source num_threads
+   Or run the shell script:
+   ```bash
+   ./yolorun.sh
+   
