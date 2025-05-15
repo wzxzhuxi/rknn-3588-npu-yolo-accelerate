@@ -43,8 +43,9 @@
    首先返回主文件夹
    ```bash
    cd ..
-   ```bash
    ./yolov5_thread_pool 模型 视频源 线程数
-   ```bash
+   ```
    或者运行sh脚本
+   ```bash
    ./yolorun.sh
+   ```
