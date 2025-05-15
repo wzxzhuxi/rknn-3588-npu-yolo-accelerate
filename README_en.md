@@ -1,6 +1,6 @@
 # rk3588 Detect Accelerate
 
-[English](README.md) | [简体中文](README.zh.md)
+[English](README_en.md) | [简体中文](README.md)
 
 ## Project Overview
 
