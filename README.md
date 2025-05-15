@@ -1,6 +1,6 @@
 # rk3588推理加速
 
-[English](README.md) | [简体中文](README.zh.md)
+[English](README_en.md) | [简体中文](README.md)
 
 ## 项目简介
 
