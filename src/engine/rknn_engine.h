@@ -1,4 +1,6 @@
-// 继承自NNEngine，实现NNEngine的接口
+// RKNPU2 后端 — NNEngine 的 RK3588 实现.
+// 走零拷贝路径: LoadModelFile 里 rknn_create_mem + rknn_set_io_mem 一次性绑定 DMA-BUF,
+// 之后 RunZeroCopy 只调 rknn_run, 不再走 rknn_inputs_set/outputs_get.
 
 #ifndef RK3588_DEMO_RKNN_ENGINE_H
 #define RK3588_DEMO_RKNN_ENGINE_H
@@ -6,31 +8,35 @@
 #include "engine.h"
 
 #include <vector>
-
 #include <rknn_api.h>
 
-// 继承自NNEngine，实现NNEngine的接口
 class RKEngine : public NNEngine
 {
 public:
-    RKEngine() : rknn_ctx_(0), ctx_created_(false), input_num_(0), output_num_(0){}; // 构造函数，初始化
-    ~RKEngine() override;                                                            // 析构函数
+    RKEngine() : rknn_ctx_(0), ctx_created_(false), input_num_(0), output_num_(0) {}
+    ~RKEngine() override;
 
-    nn_error_e LoadModelFile(const char *model_file) override;                                                         // 加载模型文件
-    const std::vector<tensor_attr_s> &GetInputShapes() override;                                                       // 获取输入张量的形状
-    const std::vector<tensor_attr_s> &GetOutputShapes() override;                                                      // 获取输出张量的形状
-    nn_error_e Run(std::vector<tensor_data_s> &inputs, std::vector<tensor_data_s> &outputs, bool want_float) override; // 运行模型
+    nn_error_e LoadModelFile(const char *model_file) override;
+    const std::vector<tensor_attr_s> &GetInputShapes()  override;
+    const std::vector<tensor_attr_s> &GetOutputShapes() override;
+    nn_error_e SetCoreMask(int core_id) override;
+
+    void *GetInputMemAddr() override;
+    void *GetOutputMemAddr(int idx) override;
+    nn_error_e RunZeroCopy() override;
 
 private:
-    // rknn context
-    rknn_context rknn_ctx_; // rknn context
-    bool ctx_created_;      // rknn context是否创建
+    rknn_context rknn_ctx_;
+    bool         ctx_created_;
+    uint32_t     input_num_;
+    uint32_t     output_num_;
 
-    uint32_t input_num_;  // 输入的数量
-    uint32_t output_num_; // 输出的数量
+    std::vector<tensor_attr_s> in_shapes_;
+    std::vector<tensor_attr_s> out_shapes_;
 
-    std::vector<tensor_attr_s> in_shapes_;  // 输入张量的形状
-    std::vector<tensor_attr_s> out_shapes_; // 输出张量的形状
+    // NPU 可见 DMA-BUF, LoadModelFile 时一次性 rknn_create_mem + rknn_set_io_mem, 析构释放
+    rknn_tensor_mem               *input_mem_ = nullptr;
+    std::vector<rknn_tensor_mem *> output_mems_;
 };
 
 #endif // RK3588_DEMO_RKNN_ENGINE_H

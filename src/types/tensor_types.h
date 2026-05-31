@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 #include "utils/logging.h"
-#include "types/error.h"
+#include "types/error_codes.h"
 
 typedef enum _tensor_layout
 {

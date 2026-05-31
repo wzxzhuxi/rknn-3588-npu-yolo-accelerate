@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "yolov5_postprocess.h"
+#include "yolov5_nms.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -23,12 +23,14 @@
 
 #include <set>
 #include <vector>
+
+#if defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
 namespace yolov5
 {
 
-#define LABEL_NALE_TXT_PATH "./model/coco_80_labels_list.txt"
-
-    // 改为自己数据集的类别
+    // COCO 80 类标签 (硬编码,跟 model 训练时的类别一致)
     static const char *labels[OBJ_CLASS_NUM] = {
         "person", "bicycle", "car", "motorbike ", "aeroplane ", "bus ", "train", "truck ", "boat", "traffic light",
         "fire hydrant", "stop sign ", "parking meter", "bench", "bird", "cat", "dog ", "horse ", "sheep", "cow", "elephant",
@@ -43,73 +45,6 @@ namespace yolov5
     const int anchor2[6] = {116, 90, 156, 198, 373, 326};
 
     inline static int clamp(float val, int min, int max) { return val > min ? (val < max ? val : max) : min; }
-
-    char *readLine(FILE *fp, char *buffer, int *len)
-    {
-        int ch;
-        int i = 0;
-        size_t buff_len = 0;
-
-        buffer = (char *)malloc(buff_len + 1);
-        if (!buffer)
-            return NULL; // Out of memory
-
-        while ((ch = fgetc(fp)) != '\n' && ch != EOF)
-        {
-            buff_len++;
-            void *tmp = realloc(buffer, buff_len + 1);
-            if (tmp == NULL)
-            {
-                free(buffer);
-                return NULL; // Out of memory
-            }
-            buffer = (char *)tmp;
-
-            buffer[i] = (char)ch;
-            i++;
-        }
-        buffer[i] = '\0';
-
-        *len = buff_len;
-
-        // Detect end
-        if (ch == EOF && (i == 0 || ferror(fp)))
-        {
-            free(buffer);
-            return NULL;
-        }
-        return buffer;
-    }
-
-    int readLines(const char *fileName, char *lines[], int max_line)
-    {
-        FILE *file = fopen(fileName, "r");
-        char *s;
-        int i = 0;
-        int n = 0;
-
-        if (file == NULL)
-        {
-            printf("Open %s fail!\n", fileName);
-            return -1;
-        }
-
-        while ((s = readLine(file, s, &n)) != NULL)
-        {
-            lines[i++] = s;
-            if (i >= max_line)
-                break;
-        }
-        fclose(file);
-        return i;
-    }
-
-    int loadLabelName(const char *locationFilename, char *label[])
-    {
-        printf("loadLabelName %s\n", locationFilename);
-        readLines(locationFilename, label, OBJ_CLASS_NUM);
-        return 0;
-    }
 
     static float
     CalculateOverlap(float xmin0, float ymin0, float xmax0, float ymax0, float xmin1, float ymin1, float xmax1,
@@ -213,6 +148,49 @@ namespace yolov5
 
     static float deqnt_affine_to_f32(int8_t qnt, int32_t zp, float scale) { return ((float)qnt - (float)zp) * scale; }
 
+    // slow path: 单个 grid 位置确实超阈值时的完整处理 (dequant 4 box + class argmax + push)
+    // 抽出来是为了 NEON fast-skip 路径里逐 lane 调用, 跟原本 scalar 路径完全等价
+    static inline void handle_hit(int8_t *input, int *anchor, int grid_h, int grid_w, int stride,
+                                  int a, int i, int j, int grid_len, int8_t thres_i8,
+                                  int32_t zp, float scale,
+                                  std::vector<float> &boxes, std::vector<float> &objProbs,
+                                  std::vector<int> &classId, int &validCount)
+    {
+        int offset = (PROP_BOX_SIZE * a) * grid_len + i * grid_w + j;
+        int8_t *in_ptr = input + offset;
+        int8_t box_confidence = in_ptr[4 * grid_len];
+        float box_x = (deqnt_affine_to_f32(*in_ptr, zp, scale)) * 2.0 - 0.5;
+        float box_y = (deqnt_affine_to_f32(in_ptr[grid_len], zp, scale)) * 2.0 - 0.5;
+        float box_w = (deqnt_affine_to_f32(in_ptr[2 * grid_len], zp, scale)) * 2.0;
+        float box_h = (deqnt_affine_to_f32(in_ptr[3 * grid_len], zp, scale)) * 2.0;
+        box_x = (box_x + j) * (float)stride;
+        box_y = (box_y + i) * (float)stride;
+        box_w = box_w * box_w * (float)anchor[a * 2];
+        box_h = box_h * box_h * (float)anchor[a * 2 + 1];
+        box_x -= (box_w / 2.0);
+        box_y -= (box_h / 2.0);
+
+        int8_t maxClassProbs = in_ptr[5 * grid_len];
+        int maxClassId = 0;
+        for (int k = 1; k < OBJ_CLASS_NUM; ++k) {
+            int8_t prob = in_ptr[(5 + k) * grid_len];
+            if (prob > maxClassProbs) {
+                maxClassId = k;
+                maxClassProbs = prob;
+            }
+        }
+        if (maxClassProbs > thres_i8) {
+            objProbs.push_back((deqnt_affine_to_f32(maxClassProbs, zp, scale)) *
+                               (deqnt_affine_to_f32(box_confidence, zp, scale)));
+            classId.push_back(maxClassId);
+            validCount++;
+            boxes.push_back(box_x);
+            boxes.push_back(box_y);
+            boxes.push_back(box_w);
+            boxes.push_back(box_h);
+        }
+    }
+
     static int process(int8_t *input, int *anchor, int grid_h, int grid_w, int height, int width, int stride,
                        std::vector<float> &boxes, std::vector<float> &objProbs, std::vector<int> &classId,
                        float threshold,
@@ -220,56 +198,66 @@ namespace yolov5
     {
         int validCount = 0;
         int grid_len = grid_h * grid_w;
-        float thres = unsigmoid(threshold);
-        int8_t thres_i8 = qnt_f32_to_affine(thres, zp, scale);
-        for (int a = 0; a < 3; a++)
-        {
-            for (int i = 0; i < grid_h; i++)
-            {
-                for (int j = 0; j < grid_w; j++)
-                {
-                    int8_t box_confidence = input[(PROP_BOX_SIZE * a + 4) * grid_len + i * grid_w + j];
-                    if (box_confidence >= thres_i8)
-                    {
-                        int offset = (PROP_BOX_SIZE * a) * grid_len + i * grid_w + j;
-                        int8_t *in_ptr = input + offset;
-                        float box_x = sigmoid(deqnt_affine_to_f32(*in_ptr, zp, scale)) * 2.0 - 0.5;
-                        float box_y = sigmoid(deqnt_affine_to_f32(in_ptr[grid_len], zp, scale)) * 2.0 - 0.5;
-                        float box_w = sigmoid(deqnt_affine_to_f32(in_ptr[2 * grid_len], zp, scale)) * 2.0;
-                        float box_h = sigmoid(deqnt_affine_to_f32(in_ptr[3 * grid_len], zp, scale)) * 2.0;
-                        box_x = (box_x + j) * (float)stride;
-                        box_y = (box_y + i) * (float)stride;
-                        box_w = box_w * box_w * (float)anchor[a * 2];
-                        box_h = box_h * box_h * (float)anchor[a * 2 + 1];
-                        box_x -= (box_w / 2.0);
-                        box_y -= (box_h / 2.0);
+        // 注意: 假设模型导出时已带 sigmoid head (airockchip yolov5s_relu.onnx + vendor 预转
+        // 的 .rknn 都是这样). 这里不额外 sigmoid — 如果换无 sigmoid head 的模型, 要在 box
+        // 解码那 4 行加 sigmoid 回去.
+        // 诊断信号: 如果换模型后每帧 AvgDet=64.00 (OBJ_NUMB_MAX_SIZE 上限) → sigmoid 不匹配.
+        int8_t thres_i8 = qnt_f32_to_affine(threshold, zp, scale);
 
-                        int8_t maxClassProbs = in_ptr[5 * grid_len];
-                        int maxClassId = 0;
-                        for (int k = 1; k < OBJ_CLASS_NUM; ++k)
-                        {
-                            int8_t prob = in_ptr[(5 + k) * grid_len];
-                            if (prob > maxClassProbs)
-                            {
-                                maxClassId = k;
-                                maxClassProbs = prob;
-                            }
-                        }
-                        if (maxClassProbs > thres_i8)
-                        {
-                            objProbs.push_back(sigmoid(deqnt_affine_to_f32(maxClassProbs, zp, scale)) *
-                                               sigmoid(deqnt_affine_to_f32(box_confidence, zp, scale)));
-                            classId.push_back(maxClassId);
-                            validCount++;
-                            boxes.push_back(box_x);
-                            boxes.push_back(box_y);
-                            boxes.push_back(box_w);
-                            boxes.push_back(box_h);
-                        }
+#if defined(__ARM_NEON)
+        // NEON 化的 fast-skip: 一次 16 个 grid 位置 compare vs threshold.
+        // box_confidence 在内存里是连续的 grid_h * grid_w 个 int8 (每 anchor 一段).
+        // ~99% 的 grid 位置 < threshold, 跳过它们 = 跳过 16 个 scalar 比较 + 16 次分支.
+        // 只有当 16 个里至少 1 个超阈值才走 scalar slow path (handle_hit).
+        const int8x16_t thres_vec = vdupq_n_s8(thres_i8);
+        for (int a = 0; a < 3; a++) {
+            int8_t *conf_base = input + (PROP_BOX_SIZE * a + 4) * grid_len;
+            int idx = 0;
+            const int total = grid_len;
+            for (; idx + 16 <= total; idx += 16) {
+                int8x16_t conf = vld1q_s8(conf_base + idx);
+                uint8x16_t mask = vcgeq_s8(conf, thres_vec);
+                // 16 字节 mask 折叠成两 64 位字, OR 看是否全 0
+                uint64_t lo = vgetq_lane_u64(vreinterpretq_u64_u8(mask), 0);
+                uint64_t hi = vgetq_lane_u64(vreinterpretq_u64_u8(mask), 1);
+                if ((lo | hi) == 0) continue;   // 全部 fail → 跳过 16 个位置
+
+                // 至少 1 个 hit, 把 mask 存到栈上扫
+                alignas(16) uint8_t mb[16];
+                vst1q_u8(mb, mask);
+                for (int k = 0; k < 16; ++k) {
+                    if (mb[k]) {
+                        int flat = idx + k;
+                        handle_hit(input, anchor, grid_h, grid_w, stride,
+                                   a, flat / grid_w, flat % grid_w, grid_len, thres_i8,
+                                   zp, scale, boxes, objProbs, classId, validCount);
+                    }
+                }
+            }
+            // tail (grid_len < 16 的余数 或不能 16 整除)
+            for (; idx < total; ++idx) {
+                if (conf_base[idx] >= thres_i8) {
+                    handle_hit(input, anchor, grid_h, grid_w, stride,
+                               a, idx / grid_w, idx % grid_w, grid_len, thres_i8,
+                               zp, scale, boxes, objProbs, classId, validCount);
+                }
+            }
+        }
+#else
+        // Scalar fallback — 跟原版完全等价, 跑非 ARM 平台时启用
+        for (int a = 0; a < 3; a++) {
+            for (int i = 0; i < grid_h; i++) {
+                for (int j = 0; j < grid_w; j++) {
+                    int8_t bc = input[(PROP_BOX_SIZE * a + 4) * grid_len + i * grid_w + j];
+                    if (bc >= thres_i8) {
+                        handle_hit(input, anchor, grid_h, grid_w, stride,
+                                   a, i, j, grid_len, thres_i8,
+                                   zp, scale, boxes, objProbs, classId, validCount);
                     }
                 }
             }
         }
+#endif
         return validCount;
     }
 
@@ -278,18 +266,6 @@ namespace yolov5
                  float nms_threshold, float scale_w, float scale_h, std::vector<int32_t> &qnt_zps,
                  std::vector<float> &qnt_scales, detect_result_group_t *group)
     {
-        static int init = -1;
-        if (init == -1)
-        {
-            int ret = 0;
-            //            ret = loadLabelName(LABEL_NALE_TXT_PATH, labels);
-            if (ret < 0)
-            {
-                return -1;
-            }
-
-            init = 0;
-        }
         memset(group, 0, sizeof(detect_result_group_t));
 
         std::vector<float> filterBoxes;
