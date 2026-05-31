@@ -1,11 +1,10 @@
-# RK3588 YOLOv5 实时检测加速
+# RK3588 YOLOv5 实时检测 · 触达 NPU 物理极限
 
 [English](README_en.md) | 简体中文
 
-端到端 **最高 175 FPS** YOLOv5s 实时视频检测,跑在 RK3588 三核 NPU 上,**NPU 99% 满载**(裸算力上限 180.5 FPS)。
+端到端 **峰值 175 FPS** YOLOv5s 实时视频检测,跑在 RK3588 三核 NPU 上 — **NPU 99% 满载,距裸算力上限 180.5 FPS 仅差 ~3%**。剩余差距是 CPU 端 postprocess + 调度 + memcpy 的**不可压缩开销**(已实验排除 DDR 争夺、ctx 数、cpuidle 等优化因素), **本架构已无显著加速空间**。
 
-源头是 [rknn-cpp-Multithreading](https://github.com/leafqycc/rknn-cpp-Multithreading),
-本仓库做了完整的性能改造 + 架构重构 。
+源头是 [rknn-cpp-Multithreading](https://github.com/leafqycc/rknn-cpp-Multithreading),本仓库做了完整的性能改造 + 架构重构,直至**触达 NPU 算力天花板**。
 
 ---
 

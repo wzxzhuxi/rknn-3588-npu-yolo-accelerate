@@ -1,12 +1,10 @@
-# RK3588 YOLOv5 Real-time Detection Accelerator
+# RK3588 YOLOv5 Real-time Detection · At the NPU Physical Limit
 
 English | [简体中文](README.md)
 
-End-to-end **up to 175 FPS** YOLOv5s real-time video detection on the RK3588 tri-core NPU —
-**99% NPU utilization** against the bare NPU compute ceiling of 180.5 FPS.
+End-to-end **peak 175 FPS** YOLOv5s real-time video detection on the RK3588 tri-core NPU — **99% NPU utilization, within ~3% of the bare compute ceiling of 180.5 FPS**. The remaining gap is irreducible CPU-side overhead (postprocess + scheduling + memcpy) — experimentally ruled out DDR contention, ctx count, cpuidle, and other candidates. **No meaningful headroom left in this architecture.**
 
-Forked from [rknn-cpp-Multithreading](https://github.com/leafqycc/rknn-cpp-Multithreading).
-This repo adds a full performance overhaul, architectural refactor.
+Forked from [rknn-cpp-Multithreading](https://github.com/leafqycc/rknn-cpp-Multithreading). This repo overhauls performance and architecture all the way up to the NPU's physical compute ceiling.
 
 ---
 
