@@ -1,0 +1,66 @@
+# ============================================================
+# 白名单模式 + 二次黑名单
+# 默认忽略顶层一切, 仅显式 ! 反选要 track 的目录/文件;
+# 反选目录内部用绝对路径再 ignore 子树, 砍掉用不到的平台冗余 (节省 ~400MB 仓库体积).
+# 优点: 新建的临时文件 (build artifacts, logs, IDE 配置, 实验脚本)
+#       不会意外进 git status 干扰 review.
+# 代价: 新增源码目录时记得来这里 ! 反选一次, 否则 git 看不到.
+#
+# 注意: 已经 git tracked 的文件不受影响 (gitignore 对已索引文件不生效).
+#       想清理它们用 `git rm --cached <path>` 后再 commit.
+# ============================================================
+
+# 1. 顶层默认忽略一切
+/*
+
+# 2. 反选源码 + 项目配置
+!/.gitignore
+!/CMakeLists.txt
+!/yolorun.sh
+!/src/
+
+# 3. 反选文档
+!/README.md
+!/README_en.md
+!/LICENSE.txt
+
+# 4. 反选 vendor 目录 (内部大量 .so/.a 是真依赖, 不能 ignore)
+!/librknn_api/
+!/3rdparty/
+
+# 5. 反选 media (演示图片)
+!/media/
+
+# 6. weights/: 反选目录, 内部仅保留两个跑得通的 .rknn 模型, 不要 .onnx / 中间衍生品
+!/weights/
+/weights/*
+# 上游原始模型 (SiLU 激活, ~140 FPS)
+!/weights/yolov5s.rknn
+# 本仓库默认 — yolorun.sh 用它, ~175 FPS 端到端
+!/weights/yolov5s_relu_pt.rknn
+
+# ============================================================
+# 二次黑名单 — 反选目录内部的平台冗余
+# 本项目目标平台: RK3588 / aarch64 / Linux. 砍掉无关平台 .a/.so 静态库.
+# ============================================================
+
+# 7. OpenCV: 仅保留 opencv-linux-aarch64. Android SDK 和 armhf 用不到.
+/3rdparty/opencv/OpenCV-android-sdk/
+/3rdparty/opencv/opencv-linux-armhf/
+
+# 8. RGA: 仅保留 RK3588/Linux/aarch64. RK356X 不是目标; Android 也不要.
+/3rdparty/rga/RK356X/
+/3rdparty/rga/RK3588/lib/Android/
+
+# 9. MPP: 仅保留 Linux/aarch64. Android subdir 不要.
+/3rdparty/mpp/Android/
+
+# 10. librknn_api: 仅保留 aarch64. armhf 不要.
+/librknn_api/armhf/
+
+# 11. 视频:
+#     - 720p60hz.h264 (raw H.264 Annex-B, ~55 MB) 直接 ship 在仓库根, yolorun.sh 默认用它,
+#       克隆后开箱即跑, 不再要求用户自备视频/转码.
+#     - 720p60hz.mp4 (~55 MB) 是上游源容器, 已用一次性 ffmpeg 转出 h264, 不进仓库.
+/720p60hz.mp4
+!/720p60hz.h264
