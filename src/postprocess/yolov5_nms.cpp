@@ -63,15 +63,16 @@ namespace yolov5
     {
         for (int i = 0; i < validCount; ++i)
         {
-            if (order[i] == -1 || classIds[i] != filterId)
+            // 按候选索引取类别 (classIds[order[i]]), 不是排序位置 i — 对齐官方 zoo 实现
+            int n = order[i];
+            if (n == -1 || classIds[n] != filterId)
             {
                 continue;
             }
-            int n = order[i];
             for (int j = i + 1; j < validCount; ++j)
             {
                 int m = order[j];
-                if (m == -1 || classIds[i] != filterId)
+                if (m == -1 || classIds[m] != filterId)
                 {
                     continue;
                 }
@@ -344,6 +345,8 @@ namespace yolov5
             group->results[last_count].box.right = (int)(clamp(x2, 0, model_in_w) / scale_w);
             group->results[last_count].box.bottom = (int)(clamp(y2, 0, model_in_h) / scale_h);
             group->results[last_count].prop = obj_conf;
+            // 原实现遗漏: detect_result_t.id 从未赋值 (恒为 0). 修复: 写入候选类别.
+            group->results[last_count].id = id;
             const char *label = labels[id];
             strncpy(group->results[last_count].name, label, OBJ_NAME_MAX_SIZE);
 

@@ -55,7 +55,7 @@ void ConvertDetections(yolov5::detect_result_group_t &det_grp, std::vector<Detec
                            det_grp.results[i].box.right - det_grp.results[i].box.left,
                            det_grp.results[i].box.bottom - det_grp.results[i].box.top);
         det.confidence = det_grp.results[i].prop;
-        det.class_id = 0;
+        det.class_id = det_grp.results[i].id;  // 原为写死 0; 后处理修复后类别 id 可用
         det.color = cv::Scalar(rand() % 255, rand() % 255, rand() % 255);
         objects.push_back(det);
     }
