@@ -6,6 +6,8 @@
 
 源头是 [rknn-cpp-Multithreading](https://github.com/leafqycc/rknn-cpp-Multithreading),本仓库做了完整的性能改造 + 架构重构,直至**触达 NPU 算力天花板**。
 
+本项目为单视频源推理程序，多路并行的推理程序仓库为[rknn-3588-yolo-multichannel](https://github.com/wzxzhuxi/rknn-3588-yolo-multichannel)
+
 ---
 
 ## 性能数字
